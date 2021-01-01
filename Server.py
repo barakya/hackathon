@@ -4,6 +4,7 @@ import struct
 import time
 import threading
 import random
+from concurrent.futures import ThreadPoolExecutor
 
 BufferSize=1024
 MyPort=2047
@@ -11,39 +12,43 @@ Team1=[]
 Team2=[]
 ToartalCount1=0
 ToartalCount2=0
+LocalIP="255.255.255.255"
 
 def run(conn):
-    #get the name in  one bytes
-    lName =''
-    count=0
-    global ToartalCount1,ToartalCount2
-    timer=time.time()+5
-    while True and time.time()<timer:
-        ch=conn.recv(1)
-        ch=ch.decode()
-        if ch=='\n':
-            break
-        lName.__add__(ch)
-    print(lName)
+    try:
+        #get the name in  one bytes
+        lName =''
+        count=0
+        global ToartalCount1,ToartalCount2
+        timer=time.time()+5
+        while True and time.time()<timer:
+            ch=conn.recv(1)
+            ch=ch.decode()
+            if ch=='\n':
+                break
+            lName.__add__(ch)
+        print(lName)
 
 
 
-    #append client to team
-    rand=random.randint(0,1)
-    if rand==0:
-        Team1.append(lName)
-    else:
-        Team2.append(lName)
-    conn.sendall("plese enter whatever you want, you have 10 sec\n")
-    timer = time.time() + 10
-    while time.time() < timer:
-        ch=conn.recv(1)
-        count=count+1
-
-    if rand==0:
-        ToartalCount1=ToartalCount1+count
-    else:
-        ToartalCount2=ToartalCount2+count
+        #append client to team
+        rand=random.randint(0,1)
+        if rand==0:
+            Team1.append(lName)
+        else:
+            Team2.append(lName)
+        conn.sendall("plese enter whatever you want, you have 10 sec\n")
+        timer = time.time() + 10
+        while time.time() < timer:
+            ch=conn.recv(1)
+            count=count+1
+        #add the points to the specific team
+        if rand==0:
+            ToartalCount1=ToartalCount1+count
+        else:
+            ToartalCount2=ToartalCount2+count
+    except:
+        print("the client disconnect")
 
 
 
@@ -52,7 +57,7 @@ def initUDPconn():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    mreq = struct.pack("IBH", 0xfeedbeef, 0x2, 2047)
+    mreq = struct.pack("IBH", 0xfeedbeef, 0x2, MyPort)
     return sock,mreq
 
 #init TCP connection
@@ -66,17 +71,20 @@ def Main():
     s = initTcpConn()
     sock, mreq = initUDPconn()
     s.listen(1)
+    executor = ThreadPoolExecutor()
     while True:
+
         timer = time.time()+10
         while time.time() < timer:
-            sock.sendto(mreq, ("255.255.255.255", 13117))
+            sock.sendto(mreq, (LocalIP, 13117))
             time.sleep(1)
             s.settimeout(0)
             try:
                 conn, add = s.accept()
                 #THREADING
-                th= threading.Thread(target=run, args=(conn,))
-                th.start()
+                executor.submit(run(conn))
+                #th= threading.Thread(target=run, args=(conn,))
+                #th.start()
 
                 if(ToartalCount1>ToartalCount2):
                     print("team 1 win the game:\n")
@@ -117,7 +125,7 @@ def tests():
     while True:
         timer = time.time() + 10
         while time.time() < timer:
-            sock.sendto(mreq, ("255.255.255.255", 13117))
+            sock.sendto(mreq, (LocalIP, 13117))
             time.sleep(1)
             s.settimeout(0)
             try:
@@ -127,7 +135,10 @@ def tests():
             conn.setblocking(1)
             data=conn.recv(BufferSize)
             print("hii " + data.decode() + " welcome to the game")
-            conn.sendall("Please Enter what ever you want you have 10 sec".encode())
+            try:
+                conn.sendall("Please Enter what ever you want you have 10 sec".encode())
+            except:
+                print("sending starting mss faild")
             timer = time.time() + 10
             while time.time() < timer:
                 ch = conn.recv(1)

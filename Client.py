@@ -2,6 +2,8 @@ import socket
 import struct
 import time
 import msvcrt
+import termios
+import sys, tty
 
 TeamName="RIPGoalDiago"
 BufferSize=1024
@@ -54,6 +56,18 @@ def Main():
             finally:
                 TCPSock.close()
 
+
+def _getch():
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
+
+
 def test():
     while True:
         client = initUDPclient()
@@ -68,7 +82,7 @@ def test():
             print(startMsg.decode())
             timer=time.time()+5
             while time.time() < timer:
-                char = msvcrt.getch()  # change to ubuntu version
+                char = _getch  # change to ubuntu version
                 try:
                     TCPSock.send(char)
                 except:
